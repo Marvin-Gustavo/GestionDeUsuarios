@@ -1,0 +1,3 @@
+{"name":"Administrador","email":"admin@importadora.com","password":"$2a$10$bOC26cuX.QMn0yNE0HrYxukD4Plah3rAnQYOO8mn2U7ZpJ.fIgs/a","role":"admin","createdAt":{"$$date":1779133423733},"_id":"HWG7VckogieT0kKp"}
+{"name":"Usuario Prueba","email":"user@importadora.com","password":"$2a$10$8VtExB3BcdmK0uQPyrqWwOA3Dd7quVfecO2tPj8E.cwb2NMqVkWC.","role":"user","createdAt":{"$$date":1779133423900},"_id":"xKDKwqEcBgvvPsA9"}
+{"name":"MARVIN","email":"destinix123@gmail.com","password":"$2a$10$cL4DzbFwpSCIfheDSnQ2feoaUIzDhHbqTJYhzI6Eyo078.OmKxNUS","role":"user","createdAt":{"$$date":1779133710889},"_id":"VsetyGsMg3Ml0Hin"}
