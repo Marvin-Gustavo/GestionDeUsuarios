@@ -49,13 +49,13 @@ const seedUsers = async () => {
   const adminExists = await db.users.findOne({ email: 'admin@importadora.com' });
   if (!adminExists) {
     const hashed = await bcrypt.hash('admin123', 10);
-    await db.users.insert({ name: 'Administrador', email: 'admin@importadora.com', password: hashed, role: 'admin', createdAt: new Date() });
+    await db.users.insert({ name: 'Administrador', email: 'admin@importadora.com', password: hashed, role: 'admin', active: true, createdAt: new Date() });
     console.log('✅ Admin creado: admin@importadora.com / admin123');
   }
   const userExists = await db.users.findOne({ email: 'user@importadora.com' });
   if (!userExists) {
     const hashed = await bcrypt.hash('user123', 10);
-    await db.users.insert({ name: 'Usuario Prueba', email: 'user@importadora.com', password: hashed, role: 'user', createdAt: new Date() });
+    await db.users.insert({ name: 'Usuario Prueba', email: 'user@importadora.com', password: hashed, role: 'user', active: true, createdAt: new Date() });
     console.log('✅ Usuario creado: user@importadora.com / user123');
   }
 };
@@ -66,6 +66,8 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await db.users.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Credenciales inválidas' });
+    if (user.active === false) return res.status(403).json({ message: 'Cuenta suspendida. Contacte al administrador.' });
+    
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ message: 'Credenciales inválidas' });
     const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
@@ -81,7 +83,7 @@ app.post('/api/auth/register', async (req, res) => {
     const exists = await db.users.findOne({ email });
     if (exists) return res.status(400).json({ message: 'El correo ya está registrado' });
     const hashed = await bcrypt.hash(password, 10);
-    const user = await db.users.insert({ name, email, password: hashed, role: 'user', createdAt: new Date() });
+    const user = await db.users.insert({ name, email, password: hashed, role: 'user', active: true, createdAt: new Date() });
     const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
     res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (e) {
@@ -96,7 +98,7 @@ app.post('/api/auth/create-user', auth, isAdmin, async (req, res) => {
     const exists = await db.users.findOne({ email });
     if (exists) return res.status(400).json({ message: 'El correo ya está registrado' });
     const hashed = await bcrypt.hash(password, 10);
-    const user = await db.users.insert({ name, email, password: hashed, role: role || 'user', createdAt: new Date() });
+    const user = await db.users.insert({ name, email, password: hashed, role: role || 'user', active: true, createdAt: new Date() });
     res.status(201).json({ message: 'Usuario creado', user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (e) {
     res.status(500).json({ message: 'Error del servidor' });
@@ -107,7 +109,34 @@ app.post('/api/auth/create-user', auth, isAdmin, async (req, res) => {
 app.get('/api/auth/users', auth, isAdmin, async (req, res) => {
   try {
     const users = await db.users.find({});
-    res.json(users.map(u => ({ id: u._id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt })));
+    res.json(users.map(u => ({ id: u._id, name: u.name, email: u.email, role: u.role, active: u.active !== false, createdAt: u.createdAt })));
+  } catch (e) {
+    res.status(500).json({ message: 'Error del servidor' });
+  }
+});
+
+// Admin: Toggle user status
+app.put('/api/auth/users/:id/status', auth, isAdmin, async (req, res) => {
+  try {
+    const user = await db.users.findOne({ _id: req.params.id });
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+    const newStatus = user.active === false ? true : false;
+    await db.users.update({ _id: req.params.id }, { $set: { active: newStatus } });
+    res.json({ message: `Cuenta ${newStatus ? 'activada' : 'suspendida'} exitosamente`, active: newStatus });
+  } catch (e) {
+    res.status(500).json({ message: 'Error del servidor' });
+  }
+});
+
+// Admin: Renew password
+app.put('/api/auth/users/:id/password', auth, isAdmin, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+    
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await db.users.update({ _id: req.params.id }, { $set: { password: hashed } });
+    res.json({ message: 'Contraseña actualizada exitosamente' });
   } catch (e) {
     res.status(500).json({ message: 'Error del servidor' });
   }
